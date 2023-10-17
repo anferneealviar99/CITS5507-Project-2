@@ -31,7 +31,7 @@ typedef struct _fish {
 int main(int argc, char* argv[])
 {
     FISH *fishes;
-    int num_nodes = 4;
+    int num_nodes;
     int node_id; // task identifier
     int num_fish; 
     int num_workers;
@@ -40,20 +40,13 @@ int main(int argc, char* argv[])
     int offset;
     int mtype;
     int source;
-    int status;
+    MPI_Status status;
 
-    fishes = (FISH) malloc(NUM_FISH * sizeof(FISH));
+    fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
     MPI_Comm_size(MPI_COMM_WORLD, &num_nodes);
-
-    if (num_nodes < 2)
-    {
-        printf("Need at least 2 MPI tasks. Aborting...\n")
-        MPI_Abort(MPI_COMM_WORLD, 0);
-        exit(EXIT_FAILURE);
-    }
     
     num_workers = num_nodes; 
 
@@ -89,27 +82,27 @@ int main(int argc, char* argv[])
         for(int dest=0; dest<num_workers; dest++)
         {
             num_fish = (dest <= extras) ? avg_partition+1 : avg_partition;
-            printf("Sending %d fish to node %d offset %d\n", num_fish, dest+1, offset)
+            printf("Sending %d fish to node %d offset %d\n", num_fish, dest+1, offset);
             MPI_Send(&offset, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
             
             for(int i = offset; i < num_fish + offset; i++)
             {
                 MPI_Send(&fishes[i].x, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
-                MPI_Send(&fishes.[i].y, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
+                MPI_Send(&fishes[i].y, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
             }
 
             offset = offset + num_fish;
         }
 
         mtype = FROM_WORKER;
-        for (i = 0; i < num_workers; i++)
+        for (int i = 0; i < num_workers; i++)
         {
             source = i;
 
             MPI_Recv(&offset, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&num_fish, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
 
-            for (int j = offset; j < num_fish + offset; j++);
+            for (int j = offset; j < num_fish + offset; j++)
             {
                 MPI_Recv(&fishes[j].x, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
                 MPI_Recv(&fishes[j].y, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
@@ -132,7 +125,7 @@ int main(int argc, char* argv[])
         MPI_Recv(&offset, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&num_fish, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
 
-        for (int j = offset; j < num_fish + offset; j++);
+        for (int j = offset; j < num_fish + offset; j++)
         {
             MPI_Recv(&fishes[j].x, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
             MPI_Recv(&fishes[j].y, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
