@@ -6,6 +6,7 @@
 #include <unistd.h> 
 #include <time.h> 
 #include <math.h>
+#include <stddef.h>
 
 #define NUM_FISH 125
 #define FISH_INIT_WEIGHT 15
@@ -16,15 +17,8 @@
 
 // Declare structure for fish, holding coordinates (for now)
 typedef struct _fish {
-    int prev_x;
-    int prev_y;
     int x;
     int y;
-    double prev_f_i;
-    double f_i;
-    double delta_f_i;
-    double prev_weight;
-    double weight;  
 } FISH;
 
 
@@ -42,9 +36,22 @@ int main(int argc, char* argv[])
     int source;
     MPI_Status status;
 
-    fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
-
     MPI_Init(&argc, &argv);
+    // Create type for struct fish
+
+    const int       nitems=2;
+    int             block_len[2] = {1, 1};
+    MPI_Datatype    types[2] = {MPI_INT, MPI_INT};
+    MPI_Datatype    mpi_fish_type; 
+    MPI_Aint        offsets[2];
+
+    offsets[0] = offsetof(FISH, x);
+    offsets[1] = offsetof(FISH, y);
+
+    MPI_Type_create_struct(nitems, block_len, offsets, types, &mpi_fish_type);
+    MPI_Type_commit(&mpi_fish_type);
+
+    fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
     MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
     MPI_Comm_size(MPI_COMM_WORLD, &num_nodes);
     
@@ -52,8 +59,6 @@ int main(int argc, char* argv[])
 
     if (node_id == MASTER)
     {
-        printf("mpi_mm has started with %d nodes.\n", num_nodes);
-        printf("Generating fish data...\n");
 
         for (int i = 0; i < NUM_FISH; i++)
         {
@@ -84,11 +89,12 @@ int main(int argc, char* argv[])
             num_fish = (dest <= extras) ? avg_partition+1 : avg_partition;
             printf("Sending %d fish to node %d offset %d\n", num_fish, dest+1, offset);
             MPI_Send(&offset, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
-            
+            MPI_Send(&num_fish, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
+
             for(int i = offset; i < num_fish + offset; i++)
             {
-                MPI_Send(&fishes[i].x, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
-                MPI_Send(&fishes[i].y, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
+                FISH send_fish = fishes[i];
+                MPI_Send(&send_fish, 1, mpi_fish_type, dest, mtype, MPI_COMM_WORLD);
             }
 
             offset = offset + num_fish;
@@ -104,8 +110,8 @@ int main(int argc, char* argv[])
 
             for (int j = offset; j < num_fish + offset; j++)
             {
-                MPI_Recv(&fishes[j].x, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
-                MPI_Recv(&fishes[j].y, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
+                FISH recv_fish;
+                MPI_Recv(&recv_fish, 1, mpi_fish_type, source, mtype, MPI_COMM_WORLD, &status);
             }
         }
 
@@ -125,20 +131,20 @@ int main(int argc, char* argv[])
         MPI_Recv(&offset, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
         MPI_Recv(&num_fish, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
 
-        for (int j = offset; j < num_fish + offset; j++)
+        for (int j = 0; j < num_fish; j++)
         {
-            MPI_Recv(&fishes[j].x, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
-            MPI_Recv(&fishes[j].y, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
+            FISH recv_fish;
+            MPI_Recv(&recv_fish, 1, mpi_fish_type, source, mtype, MPI_COMM_WORLD, &status);
         }
         
         mtype = FROM_WORKER;
         MPI_Send(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
         MPI_Send(&num_fish, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
         
-        for(int i = offset; i < num_fish + offset; i++)
+        for(int i = 0; i < num_fish; i++)
         {
-            MPI_Send(&fishes[i].x, 1, MPI_INT, source, mtype, MPI_COMM_WORLD);
-            MPI_Send(&fishes[i].y, 1, MPI_INT, source, mtype, MPI_COMM_WORLD);
+            FISH send_fish = fishes[i];
+            MPI_Send(&send_fish, 1, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD);
         }
     }
     MPI_Finalize();
