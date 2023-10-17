@@ -8,7 +8,7 @@
 #include <math.h>
 #include <stddef.h>
 
-#define NUM_FISH 125
+#define NUM_FISH 21
 #define FISH_INIT_WEIGHT 15
 
 #define MASTER 0
@@ -76,8 +76,7 @@ int main(int argc, char* argv[])
         fp1 = fopen("pre_send.txt", "w+");
         for(int i = 0; i < NUM_FISH; i++)
         {
-            fprintf(fp1, "Fish #%d\t", i+1);
-            fprintf(fp1, "Coordinates: %d, %d\n", fishes[i].x, fishes[i].y);
+            fprintf(fp1, "Fish #%d coordinates:  %d, %d\n", i+1, fishes[i].x, fishes[i].y);
         }
 
         avg_partition = NUM_FISH / num_workers;
