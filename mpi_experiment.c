@@ -24,6 +24,7 @@ typedef struct _fish {
 
 int main(int argc, char* argv[])
 {
+    MPI_Init(&argc, &argv);
     FISH *fishes;
     int num_nodes;
     int node_id; // task identifier
@@ -36,8 +37,12 @@ int main(int argc, char* argv[])
     int source;
     MPI_Status status;
 
-    MPI_Init(&argc, &argv);
+    
     // Create type for struct fish
+
+    fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
+    MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_nodes);
 
     const int       nitems=2;
     int             block_len[2] = {1, 1};
@@ -50,10 +55,6 @@ int main(int argc, char* argv[])
 
     MPI_Type_create_struct(nitems, block_len, offsets, types, &mpi_fish_type);
     MPI_Type_commit(&mpi_fish_type);
-
-    fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
-    MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
-    MPI_Comm_size(MPI_COMM_WORLD, &num_nodes);
     
     num_workers = num_nodes; 
 
