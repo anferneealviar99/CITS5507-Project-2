@@ -34,12 +34,10 @@ int main(int argc, char* argv[])
     int offset;
     int mtype;
     int source;
-
-    MPI_Init(&argc, &argv);
     MPI_Status status;
     
     // Create type for struct fish
-    
+    MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &node_id);
     MPI_Comm_size(MPI_COMM_WORLD, &num_nodes);
 
