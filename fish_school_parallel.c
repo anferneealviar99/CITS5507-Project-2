@@ -143,9 +143,11 @@ int main(int argc, char* argv[])
 
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
-    int rank;
+    int rank, num_procs;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
+
     FISH *fishes;
 
     fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
@@ -215,7 +217,7 @@ int main(int argc, char* argv[])
 
     free(fishes);
 
-    if(mpi_rank == 0) {
+    if(rank == 0) {
         printf("Time spent: %.2f\n", time_taken);
     }
 
