@@ -84,35 +84,36 @@ int main(int argc, char* argv[])
         {
             fprintf(fp1, "Fish #%d coordinates:  %d, %d\n", i+1, fishes[i].x, fishes[i].y);
         }
+        fclose(fp1);
 
         avg_partition = NUM_FISH / num_workers;
-        extras = NUM_FISH % num_workers; 
+        extra = NUM_FISH % num_workers; 
         offset = 0;
-        mtype = FROM_MASTER; 
+        msg_type = FROM_MASTER; 
 
         for(dest = 0; dest < num_workers; dest++)
         {
-            num_fish = (dest < extras) ? avg_partition+1 : avg_partition;
+            num_fish = (dest < extra) ? avg_partition+1 : avg_partition;
             printf("Sending %d fish to node %d offset %d\n", num_fish, dest+1, offset);
-            MPI_Send(&offset, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
-            MPI_Send(&num_fish, 1, MPI_INT, dest, mtype, MPI_COMM_WORLD);
+            MPI_Send(&offset, 1, MPI_INT, dest, msg_type, MPI_COMM_WORLD);
+            MPI_Send(&num_fish, 1, MPI_INT, dest, msg_type, MPI_COMM_WORLD);
 
-            MPI_Send(&fishes[offset], num_fish, mpi_fish_type, dest, mtype, MPI_COMM_WORLD);
+            MPI_Send(&fishes[offset], num_fish, mpi_fish_type, dest, msg_type, MPI_COMM_WORLD);
 
             offset += num_fish;
         }
 
-        mtype = FROM_WORKER;
+        msg_type = FROM_WORKER;
         for (int i = 0; i < num_workers; i++)
         {
             source = i;
 
-            MPI_Recv(&offset, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
-            MPI_Recv(&num_fish, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&offset, 1, MPI_INT, source, msg_type, MPI_COMM_WORLD, &status);
+            MPI_Recv(&num_fish, 1, MPI_INT, source, msg_type, MPI_COMM_WORLD, &status);
 
-            MPI_Recv(&fishes[offset], num_fish, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&fishes[offset], num_fish, mpi_fish_type, MASTER, msg_type, MPI_COMM_WORLD, &status);
 
-            printf("Received results from task %d\n", source)
+            printf("Received results from task %d\n", source);
 
         }
 
@@ -123,28 +124,29 @@ int main(int argc, char* argv[])
             fprintf(fp2, "Fish #%d\t", i+1);
             fprintf(fp2, "Coordinates: %d, %d\n", fishes[i].x, fishes[i].y);
         }
+        fclose(fp2);
 
     }
 
-    if (node_id > MASTER)
+    if (task_id > MASTER)
     {
-        mtype = FROM_MASTER;
-        MPI_Recv(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&num_fish, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
+        msg_type = FROM_MASTER;
+        MPI_Recv(&offset, 1, MPI_INT, MASTER, msg_type, MPI_COMM_WORLD, &status);
+        MPI_Recv(&num_fish, 1, MPI_INT, MASTER, msg_type, MPI_COMM_WORLD, &status);
 
         
-        MPI_Recv(fishes, num_fish, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(fishes, num_fish, mpi_fish_type, MASTER, msg_type, MPI_COMM_WORLD, &status);
 
         for (int i = 0; i < num_fish; i++)
         {
             printf("Fish coordinates: %d, %d\n", fishes[i].x, fishes[i].y);
         }
         
-        mtype = FROM_WORKER;
-        MPI_Send(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
-        MPI_Send(&num_fish, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD);
+        msg_type = FROM_WORKER;
+        MPI_Send(&offset, 1, MPI_INT, MASTER, msg_type, MPI_COMM_WORLD);
+        MPI_Send(&num_fish, 1, MPI_INT, MASTER, msg_type, MPI_COMM_WORLD);
        
-        MPI_Send(&fishes, num_fish, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD);
+        MPI_Send(&fishes, num_fish, mpi_fish_type, MASTER, msg_type, MPI_COMM_WORLD);
     }
 
     MPI_Finalize();
