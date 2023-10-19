@@ -5,6 +5,7 @@
 #include <unistd.h> 
 #include <time.h> 
 #include <math.h>
+#include <mpi.h>
 
 #define NUM_STEPS 10
 #define NUM_FISH 10000000
