@@ -139,6 +139,13 @@ double obj_func (FISH* fishes)
 
 int main(int argc, char* argv[])
 {
+    int provided;
+
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
+
+    int rank;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     FISH *fishes;
 
     fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
@@ -163,7 +170,6 @@ int main(int argc, char* argv[])
     }
 
     double total_sum;
-    
 
     for (int i = 0; i < NUM_STEPS; i++)
     {
@@ -209,5 +215,9 @@ int main(int argc, char* argv[])
 
     free(fishes);
 
-    printf("Time spent: %.2f\n", time_taken); 
+    if(mpi_rank == 0) {
+        printf("Time spent: %.2f\n", time_taken);
+    }
+
+    MPI_Finalize();
 }
