@@ -117,8 +117,8 @@ int main(int argc, char* argv[])
         fp2 = fopen("post_send.txt", "w+");
         for(int i = 0; i < NUM_FISH; i++)
         {
-            fprintf(fp1, "Fish #%d\t", i+1);
-            fprintf(fp1, "Coordinates: %d, %d\n", fishes[i].x, fishes[i].y);
+            fprintf(fp2, "Fish #%d\t", i+1);
+            fprintf(fp2, "Coordinates: %d, %d\n", fishes[i].x, fishes[i].y);
         }
 
     }
@@ -126,13 +126,13 @@ int main(int argc, char* argv[])
     if (node_id > MASTER)
     {
         mtype = FROM_MASTER;
-        MPI_Recv(&offset, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
-        MPI_Recv(&num_fish, 1, MPI_INT, source, mtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&offset, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
+        MPI_Recv(&num_fish, 1, MPI_INT, MASTER, mtype, MPI_COMM_WORLD, &status);
 
         for (int j = 0; j < num_fish; j++)
         {
             FISH recv_fish;
-            MPI_Recv(&recv_fish, 1, mpi_fish_type, source, mtype, MPI_COMM_WORLD, &status);
+            MPI_Recv(&recv_fish, 1, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD, &status);
         }
         
         mtype = FROM_WORKER;
@@ -145,6 +145,7 @@ int main(int argc, char* argv[])
             MPI_Send(&send_fish, 1, mpi_fish_type, MASTER, mtype, MPI_COMM_WORLD);
         }
     }
+    
     MPI_Finalize();
 
     free(fishes);
