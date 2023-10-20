@@ -7,8 +7,9 @@
 #include <math.h>
 #include <mpi.h>
 
+#define ROOT_NUM 0;
 #define NUM_STEPS 10
-#define NUM_FISH 10000000
+#define NUM_FISH 1000
 #define FISH_INIT_WEIGHT 15
 
 // Declare structure for fish, holding coordinates (for now)
@@ -71,23 +72,29 @@ void swim(FISH* fishes, int num_fish) {
 }
 
 
-// Function for parallelized weight_function
-void weight_function(FISH* fishes, int num_fish) {
-    double maxDelta = 0.0;
+double get_max_delta(FISH *fishes, int num_fish)
+{
+    double max_delta = 0.0;
 
     #pragma omp parallel
     { 
         #pragma omp for // reduction(max:maxDelta)
-        for (int i = 0; i < num_fish; i++) {
+        for (int i = 0; i < num_fish; i++) 
+        {
             fishes[i].delta_f_i = fishes[i].f_i - fishes[i].prev_f_i;
 
-            if (fishes[i].delta_f_i > maxDelta) {
-                maxDelta = fishes[i].delta_f_i;
+            if (fishes[i].delta_f_i > max_delta) 
+            {
+                max_delta = fishes[i].delta_f_i;
             }
         }
-    // printf("Max delta: %f\n", maxDelta);
     }
 
+    return max_delta;
+}
+// Function for parallelized weight_function
+void weight_function(FISH* fishes, int num_fish, double max_delta) 
+{
     #pragma omp parallel 
     {   
         #pragma omp for
@@ -102,7 +109,7 @@ double calc_euc_dist (FISH fish)
     return sqrt(pow((double)fish.x, 2) + pow((double)fish.y, 2));
 }
 
-double obj_func (FISH* fishes) 
+double obj_func (FISH* fishes, num_fish) 
 {
     
     double total_sum = 0;
@@ -144,21 +151,22 @@ int main(int argc, char* argv[])
 
     MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
 
-    int rank, num_procs;
+    int rank, num_procs, fishes_per_process;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
 
-    FISH *fishes;
+    FISH *fishes, *local_fishes;
 
     fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
+    local_fishes = (FISH*) malloc(fishes_per_process * sizeof(FISH));
 
     double start = omp_get_wtime();
     
-    // Generate positions for the fish
-    #pragma omp parallel
+    // Generate positions for the fish; handled by master process
+    if (rank == 0)
     {
-        #pragma omp for
+        #pragma omp parallel for
         for (int i = 0; i < NUM_FISH; i++)
         {
             int x_rand_num = rand() % 201 - 100;
@@ -172,42 +180,96 @@ int main(int argc, char* argv[])
         }
     }
 
-    double total_sum;
+    // Determine how many fish are distributed per process
+    fishes_per_process = NUM_FISH / num_procs; 
+
+    // Send fish to different processes
+    MPI_Scatter(fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
+        local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 0, MPI_COMM_WORLD);
+    
+    double local_total_sum, global_total_sum, barycentre;
 
     for (int i = 0; i < NUM_STEPS; i++)
     {
         
         if (i == 0)
         {
-            
-            // Weight function is random value at the very first step
-            total_sum = obj_func(fishes);
+            local_total_sum = obj_func(fishes, fishes_per_process);
 
+            // Perform reduction to calculate global total sum, which will be used to calculate barycentre
+            MPI_Reduce(&local_total_sum, &global_total_sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+            
+            /*   Perform OpenMP parallelisation on the loop; 
+             *   uses local_fishes variable in order to be gathered altogether later 
+             */
             #pragma omp parallel 
             {
                 #pragma omp for 
-                for (int j = 0; j < NUM_FISH; j++)
+                for (int j = 0; j < fishes_per_process; j++)
                 {
-                    double current_weight = fishes[j].weight;
+                    double current_weight = local_fishes[j].weight;
+                    // Weight function is random value at the very first step
                     double weight_func = rand() % 5 - 1;
-                    fishes[j].weight += weight_func;
+                    local_fishes[j].weight += weight_func;
 
                 }
             }
             
-            swim(fishes, NUM_FISH);
+            // Perform swim function on the fishes 
+            swim(local_fishes, fishes_per_process);
+
+            // Gather all fish for barycentre calculation
+            MPI_Gather(local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
+                fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 0, MPI_COMM_WORLD);
+
+            
+            // Master process performs collective action
+            if(rank == 0)
+            {
+                barycentre = CollectiveAction(fishes, NUM_FISH, global_total_sum);
+            }
+
+            // Information then scattered to worker processes
+            MPI_Scatter(fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
+                local_fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
         }
         else
         {
-            // ADD ALL WEIGHTS FOR FISH 
-            total_sum = obj_func(fishes);
-            // weight_function(fishes); 
-            weight_function(fishes, NUM_FISH);  
+            // ADD ALL WEIGHTS FOR FISH - LOCAL
+            local_total_sum = obj_func(fishes);
 
-            swim(fishes, NUM_FISH);
+            // Get the global total sum across all processes for barycentre calculation
+            MPI_Reduce(&local_total_sum, &global_total_sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-            double barycentre = CollectiveAction(fishes, NUM_FISH, total_sum);
+            double local_max_delta, global_max_delta;
             
+            // Get local max delta for each process
+            local_max_delta = get_max_delta(local_fishes, fishes_per_process);
+
+            // Get global max delta to use for calculating new weights
+            MPI_Allreduce(&local_max_delta, &global_max_delta, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+            // Calculate weight for all fishes
+            weight_function(local_fishes, fishes_per_process, global_max_delta);  
+
+            // Perform swim function
+            swim(local_fishes, fishes_per_process);
+
+            // Gather all fishes
+            MPI_Gather(local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
+                fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
+
+
+            // Perform collective action
+            if(rank == 0)
+            {
+                barycentre = CollectiveAction(fishes, NUM_FISH, global_total_sum);
+            }
+
+            // Scatter fish
+            MPI_Scatter(fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
+                local_fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
         }
         
     }
@@ -216,9 +278,11 @@ int main(int argc, char* argv[])
 
     double time_taken= end-start;
 
-    free(fishes);
+    free(local_fishes);
 
-    if(rank == 0) {
+    if(rank == 0) 
+    {
+        free(fishes);
         printf("Time spent: %.2f\n", time_taken);
     }
 
