@@ -162,11 +162,12 @@ int main(int argc, char* argv[])
     fishes = (FISH*) malloc(NUM_FISH * sizeof(FISH));
     local_fishes = (FISH*) malloc(fishes_per_process * sizeof(FISH));
 
-    double start = omp_get_wtime();
+    
     
     // Generate positions for the fish; handled by master process
     if (rank == 0)
     {
+        double start = omp_get_wtime();
         #pragma omp parallel for
         for (int i = 0; i < NUM_FISH; i++)
         {
@@ -238,7 +239,7 @@ int main(int argc, char* argv[])
         else
         {
             // ADD ALL WEIGHTS FOR FISH - LOCAL
-            local_total_sum = obj_func(fishes);
+            local_total_sum = obj_func(fishes, fishes_per_process);
 
             // Get the global total sum across all processes for barycentre calculation
             MPI_Reduce(&local_total_sum, &global_total_sum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -270,19 +271,21 @@ int main(int argc, char* argv[])
 
             // Scatter fish
             MPI_Scatter(fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
-                local_fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
+                local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 0, MPI_COMM_WORLD);
         }
         
     }
 
-    double end = omp_get_wtime();
-
-    double time_taken= end-start;
+    
 
     free(local_fishes);
 
     if(rank == 0) 
     {
+        double end = omp_get_wtime();
+
+        double time_taken= end-start;
+
         free(fishes);
         printf("Time spent: %.2f\n", time_taken);
     }
