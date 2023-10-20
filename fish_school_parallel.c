@@ -45,6 +45,7 @@ double CollectiveAction(FISH* fishes, int num_fish, double total_obj_func) {
 
     // Calculate the barycenter
     double barycenter = total_distance_times_weight / total_obj_func;
+    return barycenter;
 }
 
 
