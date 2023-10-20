@@ -100,7 +100,7 @@ void weight_function(FISH* fishes, int num_fish, double max_delta)
     {   
         #pragma omp for
         for (int i = 0; i < num_fish; i++) {
-            fishes[i].weight += (fishes[i].delta_f_i / maxDelta);
+            fishes[i].weight += (fishes[i].delta_f_i / max_delta);
         }
     }
 }
@@ -110,7 +110,7 @@ double calc_euc_dist (FISH fish)
     return sqrt(pow((double)fish.x, 2) + pow((double)fish.y, 2));
 }
 
-double obj_func (FISH* fishes, num_fish) 
+double obj_func (FISH* fishes, int num_fish) 
 {
     
     double total_sum = 0;
@@ -118,7 +118,7 @@ double obj_func (FISH* fishes, num_fish)
     #pragma omp parallel
     {
         #pragma omp for 
-        for (int i = 0; i < NUM_FISH; i++)
+        for (int i = 0; i < num_fish; i++)
         {
 
             // Set the current f_i to the previous f_i
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
 
             // Information then scattered to worker processes
             MPI_Scatter(fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
-                local_fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
+                local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 0, MPI_COMM_WORLD);
         }
         else
         {
@@ -249,7 +249,7 @@ int main(int argc, char* argv[])
             local_max_delta = get_max_delta(local_fishes, fishes_per_process);
 
             // Get global max delta to use for calculating new weights
-            MPI_Allreduce(&local_max_delta, &global_max_delta, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+            MPI_Allreduce(&local_max_delta, &global_max_delta, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
             // Calculate weight for all fishes
             weight_function(local_fishes, fishes_per_process, global_max_delta);  
@@ -259,7 +259,7 @@ int main(int argc, char* argv[])
 
             // Gather all fishes
             MPI_Gather(local_fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 
-                fishes, fishes_per_process * sizeof(FISH), 0, MPI_COMM_WORLD);
+                fishes, fishes_per_process * sizeof(FISH), MPI_BYTE, 0, MPI_COMM_WORLD);
 
 
             // Perform collective action
