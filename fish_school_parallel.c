@@ -163,11 +163,11 @@ int main(int argc, char* argv[])
     local_fishes = (FISH*) malloc(fishes_per_process * sizeof(FISH));
 
     
-    
+    double start, end;
     // Generate positions for the fish; handled by master process
     if (rank == 0)
     {
-        double start = omp_get_wtime();
+        start = MPI_Wtime();
         #pragma omp parallel for
         for (int i = 0; i < NUM_FISH; i++)
         {
@@ -282,7 +282,7 @@ int main(int argc, char* argv[])
 
     if(rank == 0) 
     {
-        double end = omp_get_wtime();
+        end = MPI_Wtime();
 
         double time_taken= end-start;
 
