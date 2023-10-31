@@ -10,5 +10,5 @@
 #module load openmpi/4.0.5
 
 export OMP_NUM_THREADS=16
-mpicc -fopenmp -o fish_school_parallel fish_school_parallel.c
+mpicc -fopenmp fish_school_parallel.c -o -lm fish_school_parallel 
 srun ./fish_school_parallel
